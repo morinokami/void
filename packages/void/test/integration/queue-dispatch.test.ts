@@ -183,7 +183,8 @@ export { __processQueue } from "virtual:void-routes";\n`,
     expect(env.calls).toEqual([{ handler: expectedHandler, queue, attempts: [2, 3], dates: true }]);
   });
 
-  it('returns failure without dispatching an unknown logical or physical queue', async () => {
+  it('logs and returns failure without dispatching an unknown logical or physical queue', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
     for (const queue of ['unknown', 'project-unknown']) {
       const env = { calls: [] as Array<Record<string, unknown>> };
       const result = await generated.__processQueue(payload(queue), env);
@@ -194,6 +195,10 @@ export { __processQueue } from "virtual:void-routes";\n`,
       });
       expect(env.calls).toEqual([]);
     }
+    expect(errorLog.mock.calls).toEqual([
+      ['[void] No unambiguous queue handler matches "unknown"'],
+      ['[void] No unambiguous queue handler matches "project-unknown"'],
+    ]);
   });
 
   it('logs a failed handler with its file and queue and returns failure', async () => {

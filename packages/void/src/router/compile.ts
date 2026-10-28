@@ -559,15 +559,17 @@ export function compileRouteTable(
     lines.push(`const __queueLabels = ${JSON.stringify(queueLabels)};`);
     // Queue dispatch as a standalone function — called directly by native queue handler
     // and via the authenticated HTTP route. No global mutable state needed.
-    // It logs a handler's error. Otherwise Cloudflare would record only the native
-    // handler's "queue: Handler failed.", and the dev server and Void Cloud nothing.
+    // It logs why a batch failed: the native handler throws only "queue: Handler failed.",
+    // the HTTP route returns no handler error, and the Void Cloud relay ignores `error`.
     lines.push('export async function __processQueue(payload, env) {');
     lines.push('  const queueSuffix = payload.queue;');
     lines.push('  const __queueIndex = __resolveQueueIndex(queueSuffix);');
     lines.push('  if (__queueIndex === -1) {');
     lines.push(
-      '    return { ok: false, error: `No unambiguous queue handler matches "${String(queueSuffix)}"` };',
+      '    const __error = `No unambiguous queue handler matches "${String(queueSuffix)}"`;',
     );
+    lines.push('    console.error(`[void] ${__error}`);');
+    lines.push('    return { ok: false, error: __error };');
     lines.push('  }');
     lines.push('  const __decisions = new Map();');
     lines.push('  function __wrapMsg(m) {');
@@ -1356,7 +1358,6 @@ ${envValidateCall}${remoteEnvSwap}${isrDeploymentStamp}  const userEnv = __filte
       else if (d.action === "retry") m.retry(d.delaySeconds != null ? { delaySeconds: d.delaySeconds } : undefined);
     }
   }
-  if (__qr.error) console.error(\`[void] \${__qr.error}\`);
   if (!__qr.ok) throw new Error("queue: Handler failed.");
 }
 
